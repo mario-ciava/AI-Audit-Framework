@@ -12,8 +12,8 @@ from .testing import SystematicTester
 class AuditOrchestrator:
     def __init__(self, config: Optional[Config] = None, *, constraints: Optional[ConstraintChecker] = None):
         self.config = config or Config()
-        self.crypto = SimpleCrypto()
-        self.chain = MerkleChain(self.crypto)
+        self.crypto = SimpleCrypto(self.config.key_path)
+        self.chain = MerkleChain(self.crypto, storage_path=self.config.chain_path)
         self.constraints = constraints or setup_financial_constraints()
         self.privacy = PrivacyAccountant(self.config)
         self.drift_detector = MultivariateDriftDetector(self.config)

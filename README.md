@@ -64,6 +64,8 @@ You’ll see a complete report including:
 - integrity verification;
 - privacy budget usage.
 
+By default the framework persists the Merkle chain and HMAC key under `audit_state/`, so repeated CLI runs can verify the exact same log. Remove that directory (or point `Config.chain_path` / `Config.key_path` elsewhere) to reset the history.
+
 ## Library Usage
 
 You can import and use the framework directly from the `ai_audit` package.  
@@ -133,6 +135,7 @@ python3 -m interface.cli --demo
 | Drift          | Hotelling’s T² (diagonal covariance)   | Sensitivity to statistical shifts                   |
 | Testing        | Deterministic suite                    | Repeatable QA for boundary/policy/security cases    |
 | Determinism    | Canonical JSON serialization           | Stable hashes and reproducible outputs              |
+| Persistence    | Disk-backed Merkle chain + HMAC key    | Re-verifiable audit trail across sessions           |
 
 ## Security & Privacy Notes
 
@@ -140,6 +143,7 @@ python3 -m interface.cli --demo
 - No networking, PoW or consensus is involved; the log is entirely local.  
 - The privacy accountant tracks and enforces the total ε-budget; noisy outputs are clipped to configured bounds.  
 - A re-entrant lock protects concurrent writes to the Merkle chain.
+- The signing key and Merkle chain are stored locally (defaults under `audit_state/`). Protect or relocate these files via the configuration to fit your operational security requirements.
 
 ## Limitations
 
