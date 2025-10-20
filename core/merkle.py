@@ -1,6 +1,10 @@
-import threading, time
+import json
+import os
+import threading
+import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 from .crypto import SimpleCrypto
 from .utils import canonical_json
 
@@ -15,16 +19,32 @@ class MerkleNode:
 
 class MerkleChain:
     """Tamper-evident log via hash chaining and HMAC signatures."""
-    def __init__(self, crypto: SimpleCrypto):
+    def __init__(self, crypto: SimpleCrypto, storage_path: Optional[str] = None):
         self.crypto = crypto
+        self.storage_path = Path(storage_path) if storage_path else None
         self.chain: List[MerkleNode] = []
         self._lock = threading.RLock()
-        self._create_genesis()
+        if not self._load_existing_chain():
+            self._create_genesis()
 
     def _create_genesis(self):
         data = {"type": "genesis", "timestamp": time.time()}
         with self._lock:
             self._add_block(data, prev_hash="0"*64)
+
+    def _load_existing_chain(self) -> bool:
+        if not self.storage_path or not self.storage_path.exists():
+            return False
+        with self._lock:
+            payload = json.loads(self.storage_path.read_text(encoding="utf-8"))
+            entries = payload.get("chain", [])
+            if not entries:
+                return False
+            self.chain = [self._dict_to_node(entry) for entry in entries]
+            valid, errors = self.verify_integrity()
+            if not valid:
+                raise ValueError(f"Stored Merkle chain failed integrity: {errors}")
+            return True
 
     def _compute_hash(self, index: int, timestamp: float, data: Dict, prev_hash: str) -> str:
         block_content = {"index": index, "timestamp": timestamp, "data": data, "prev_hash": prev_hash}
@@ -37,6 +57,7 @@ class MerkleChain:
         signature = self.crypto.sign(block_hash.encode())
         node = MerkleNode(index, timestamp, data, prev_hash, block_hash, signature)
         self.chain.append(node)
+        self._persist_locked()
         return block_hash
 
     def add_record(self, data: Dict[str, Any]) -> str:
@@ -56,3 +77,35 @@ class MerkleChain:
                 if i > 0 and node.prev_hash != self.chain[i-1].hash:
                     errors.append(f"Block {i}: broken chain link")
         return len(errors) == 0, errors
+
+    def _persist_locked(self):
+        if not self.storage_path:
+            return
+        self.storage_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {"chain": [self._node_to_dict(node) for node in self.chain]}
+        tmp_path = self.storage_path.parent / (self.storage_path.name + ".tmp")
+        with open(tmp_path, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, ensure_ascii=True, separators=(",", ":"), sort_keys=True)
+        os.replace(tmp_path, self.storage_path)
+
+    @staticmethod
+    def _node_to_dict(node: MerkleNode) -> Dict[str, Any]:
+        return {
+            "index": node.index,
+            "timestamp": node.timestamp,
+            "data": node.data,
+            "prev_hash": node.prev_hash,
+            "hash": node.hash,
+            "signature": node.signature.hex()
+        }
+
+    @staticmethod
+    def _dict_to_node(payload: Dict[str, Any]) -> MerkleNode:
+        return MerkleNode(
+            index=payload["index"],
+            timestamp=payload["timestamp"],
+            data=payload["data"],
+            prev_hash=payload["prev_hash"],
+            hash=payload["hash"],
+            signature=bytes.fromhex(payload["signature"])
+        )

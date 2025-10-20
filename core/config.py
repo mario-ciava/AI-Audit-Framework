@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 @dataclass
 class Config:
@@ -22,3 +23,7 @@ class Config:
     # Bounds for clipping
     amount_min: float = 0.0
     amount_max: float = 10_000_000.0
+
+    # Persistence
+    key_path: Optional[str] = "audit_state/hmac_key.bin"
+    chain_path: Optional[str] = "audit_state/merkle_chain.json"
