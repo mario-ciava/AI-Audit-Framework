@@ -1,5 +1,7 @@
+import json
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Sequence
 
 class ConstraintChecker:
     @dataclass
@@ -25,30 +27,110 @@ class ConstraintChecker:
                 violations.append({"id": c.id, "severity": "error", "description": f"Check failed: {e}"})
         return violations
 
-def setup_financial_constraints() -> ConstraintChecker:
+def build_constraints_from_specs(specs: Sequence[Dict[str, Any]]) -> ConstraintChecker:
     checker = ConstraintChecker()
-    checker.add_constraint(ConstraintChecker.Constraint(
-        id="ltv_limit",
-        check_fn=lambda ctx: (ctx.get("loan_amount", 0) / max(ctx.get("property_value", 1), 1)) <= 0.8,
-        severity="high",
-        description="Loan-to-value ratio must be <= 80%"
-    ))
-    checker.add_constraint(ConstraintChecker.Constraint(
-        id="dsr_limit",
-        check_fn=lambda ctx: (ctx.get("monthly_debt", 0) / max(ctx.get("monthly_income", 1), 1)) <= 0.35,
-        severity="high",
-        description="Debt service ratio must be <= 35%"
-    ))
-    checker.add_constraint(ConstraintChecker.Constraint(
-        id="var_limit",
-        check_fn=lambda ctx: ctx.get("marginal_var", 0) <= ctx.get("var_limit", 1.0),
-        severity="critical",
-        description="VaR must be within limit"
-    ))
-    checker.add_constraint(ConstraintChecker.Constraint(
-        id="positive_amounts",
-        check_fn=lambda ctx: all(ctx.get(k, 0) > 0 for k in ["loan_amount","property_value","monthly_income"]),
-        severity="critical",
-        description="All amounts must be positive"
-    ))
+    for spec in specs:
+        check_fn = _constraint_fn_from_spec(spec)
+        checker.add_constraint(ConstraintChecker.Constraint(
+            id=spec["id"],
+            severity=spec.get("severity","info"),
+            description=spec.get("description",""),
+            check_fn=check_fn
+        ))
     return checker
+
+def _constraint_fn_from_spec(spec: Dict[str, Any]) -> Callable[[Dict[str, Any]], bool]:
+    ctype = spec.get("type")
+    if ctype == "ratio_max":
+        numerator = spec["numerator"]
+        denominator = spec["denominator"]
+        limit = float(spec["max"])
+        min_denominator = float(spec.get("min_denominator", 1.0))
+        def check_fn(ctx: Dict[str, Any]) -> bool:
+            denom = max(float(ctx.get(denominator, 0.0)), min_denominator)
+            num = float(ctx.get(numerator, 0.0))
+            return (num / denom) <= limit
+        return check_fn
+    if ctype == "lte_field":
+        field = spec["field"]
+        other = spec["other_field"]
+        fallback = float(spec.get("other_default", float("inf")))
+        def check_fn(ctx: Dict[str, Any]) -> bool:
+            lhs = float(ctx.get(field, 0.0))
+            rhs = float(ctx.get(other, fallback))
+            return lhs <= rhs
+        return check_fn
+    if ctype == "positive":
+        fields = list(spec.get("fields", []))
+        def check_fn(ctx: Dict[str, Any]) -> bool:
+            return all(float(ctx.get(f, 0.0)) > 0 for f in fields)
+        return check_fn
+    if ctype == "value_max":
+        field = spec["field"]
+        limit = float(spec["max"])
+        def check_fn(ctx: Dict[str, Any]) -> bool:
+            return float(ctx.get(field, 0.0)) <= limit
+        return check_fn
+    raise ValueError(f"Unsupported constraint type: {ctype}")
+
+def load_constraints_from_json(path: str) -> ConstraintChecker:
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    if isinstance(payload, dict):
+        specs = payload.get("constraints", [])
+    else:
+        specs = payload
+    if not isinstance(specs, list):
+        raise ValueError("Constraint definition must be a list or wrap a 'constraints' key")
+    return build_constraints_from_specs(specs)
+
+DEFAULT_FINANCIAL_CONSTRAINTS: List[Dict[str, Any]] = [
+    {
+        "id": "ltv_limit",
+        "type": "ratio_max",
+        "numerator": "loan_amount",
+        "denominator": "property_value",
+        "max": 0.8,
+        "severity": "high",
+        "description": "Loan-to-value ratio must be <= 80%"
+    },
+    {
+        "id": "dsr_limit",
+        "type": "ratio_max",
+        "numerator": "monthly_debt",
+        "denominator": "monthly_income",
+        "max": 0.35,
+        "severity": "high",
+        "description": "Debt service ratio must be <= 35%"
+    },
+    {
+        "id": "var_limit",
+        "type": "lte_field",
+        "field": "marginal_var",
+        "other_field": "var_limit",
+        "other_default": 1.0,
+        "severity": "critical",
+        "description": "VaR must be within limit"
+    },
+    {
+        "id": "positive_amounts",
+        "type": "positive",
+        "fields": ["loan_amount","property_value","monthly_income"],
+        "severity": "critical",
+        "description": "All amounts must be positive"
+    }
+]
+
+def setup_financial_constraints() -> ConstraintChecker:
+    return build_constraints_from_specs(DEFAULT_FINANCIAL_CONSTRAINTS)
+
+POLICY_REGISTRY: Dict[str, Callable[[], ConstraintChecker]] = {}
+
+def register_policy_profile(name: str, builder: Callable[[], ConstraintChecker]):
+    POLICY_REGISTRY[name] = builder
+
+def get_policy_profile(name: str) -> ConstraintChecker:
+    if name not in POLICY_REGISTRY:
+        raise ValueError(f"Unknown policy profile '{name}'")
+    return POLICY_REGISTRY[name]()
+
+register_policy_profile("financial_basic", setup_financial_constraints)
