@@ -27,3 +27,7 @@ class Config:
     # Persistence
     key_path: Optional[str] = "audit_state/hmac_key.bin"
     chain_path: Optional[str] = "audit_state/merkle_chain.json"
+
+    # Policy configuration
+    policy_profile: str = "financial_basic"
+    policy_config_path: Optional[str] = None

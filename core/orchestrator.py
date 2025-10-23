@@ -4,7 +4,7 @@ from collections import defaultdict
 from .config import Config
 from .crypto import SimpleCrypto
 from .merkle import MerkleChain
-from .constraints import setup_financial_constraints, ConstraintChecker
+from .constraints import ConstraintChecker, get_policy_profile, load_constraints_from_json
 from .privacy import PrivacyAccountant
 from .drift import MultivariateDriftDetector
 from .testing import SystematicTester
@@ -14,7 +14,7 @@ class AuditOrchestrator:
         self.config = config or Config()
         self.crypto = SimpleCrypto(self.config.key_path)
         self.chain = MerkleChain(self.crypto, storage_path=self.config.chain_path)
-        self.constraints = constraints or setup_financial_constraints()
+        self.constraints = constraints or self._init_constraints()
         self.privacy = PrivacyAccountant(self.config)
         self.drift_detector = MultivariateDriftDetector(self.config)
         self.tester = SystematicTester()
@@ -106,3 +106,8 @@ class AuditOrchestrator:
                 "drift_mode": self.config.drift_mode
             }
         }
+
+    def _init_constraints(self) -> ConstraintChecker:
+        if self.config.policy_config_path:
+            return load_constraints_from_json(self.config.policy_config_path)
+        return get_policy_profile(self.config.policy_profile)

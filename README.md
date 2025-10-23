@@ -66,6 +66,27 @@ You’ll see a complete report including:
 
 By default the framework persists the Merkle chain and HMAC key under `audit_state/`, so repeated CLI runs can verify the exact same log. Remove that directory (or point `Config.chain_path` / `Config.key_path` elsewhere) to reset the history.
 
+### Policy Profiles
+
+Constraints are organized as profiles. The default `financial_basic` bundle mirrors the logic in `policies/financial_basic.json`. You can either select another registered profile via `Config(policy_profile="...")` or point `Config.policy_config_path` to a JSON file using the same schema:
+
+```json
+{
+  "constraints": [
+    {"id": "ltv_limit", "type": "ratio_max", "numerator": "...", "denominator": "...", "max": 0.8},
+    {"id": "dsr_limit", "type": "ratio_max", ...},
+    {"id": "var_limit", "type": "lte_field", "field": "marginal_var", "other_field": "var_limit"},
+    {"id": "positive_amounts", "type": "positive", "fields": ["loan_amount", "..."]}
+  ]
+}
+```
+
+Supported constraint `type` values include:
+- `ratio_max`: `numerator / denominator <= max` (with optional `min_denominator` safeguard);
+- `lte_field`: left field must be less-or-equal than another field (with optional `other_default`);
+- `positive`: every field listed must be strictly positive;
+- `value_max`: single field must stay under a constant `max`.
+
 ## Library Usage
 
 You can import and use the framework directly from the `ai_audit` package.  
@@ -155,7 +176,7 @@ python3 -m interface.cli --demo
 
 - **Asymmetric signatures** — integrate Ed25519 for per-block non-repudiation.  
 - **Full drift mode** — switch to full covariance or streaming estimators (NumPy).  
-- **Configurable policies** — load constraint sets from declarative files (YAML/JSON).  
+- **Configurable policies** — ship additional JSON profiles or build loaders from external systems.  
 - **Persistence** — export the Merkle chain to disk or immutable storage (e.g., S3 Object Lock).  
 - **Reporting** — produce JSON or HTML summaries for audit results and privacy usage.
 
@@ -163,5 +184,5 @@ python3 -m interface.cli --demo
 
 - [ ] Optional Ed25519 signatures for external attestation  
 - [ ] NumPy-backed full-covariance drift mode  
-- [ ] Pluggable constraint registry (configurable policy profiles)   
+- [x] Pluggable constraint registry (basic JSON policy profiles)   
 - [ ] Simple HTML summary report (no web framework)
