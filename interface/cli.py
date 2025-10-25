@@ -12,9 +12,17 @@ def main():
     p.add_argument("--demo", action="store_true", help="Run the demo sequence")
     p.add_argument("--demo-batch", action="store_true", help="Replay the mortgage CSV demo")
     p.add_argument("--data-path", default="data/sample_mortgages.csv", help="CSV dataset for --demo-batch")
+    p.add_argument("--policy-profile", default="financial_basic", help="Policy profile to load (registry name)")
+    p.add_argument("--policy-config", help="Path to JSON policy config (overrides --policy-profile)")
     args = p.parse_args()
 
-    config = Config(max_epsilon=20.0, drift_threshold=2.5, drift_window_size=50)
+    config = Config(
+        max_epsilon=20.0,
+        drift_threshold=2.5,
+        drift_window_size=50,
+        policy_profile=args.policy_profile,
+        policy_config_path=args.policy_config
+    )
 
     if args.tests:
         orch = AuditOrchestrator(config)
@@ -29,10 +37,14 @@ def main():
         print(json.dumps(orch.get_portfolio_summary(), indent=2))
         return
     if args.demo_batch:
-        run_batch_from_csv(args.data_path)
+        run_batch_from_csv(
+            args.data_path,
+            policy_profile=args.policy_profile,
+            policy_config_path=args.policy_config
+        )
         return
 
-    demo_main()
+    demo_main(policy_profile=args.policy_profile, policy_config_path=args.policy_config)
 
 if __name__ == "__main__":
     main()

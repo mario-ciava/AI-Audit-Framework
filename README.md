@@ -68,6 +68,14 @@ By default the framework persists the Merkle chain and HMAC key under `audit_sta
 
 The example scenario is a **toy retail mortgage underwriting flow**. Inputs (`loan_amount`, `property_value`, `monthly_income`, etc.) refer to the borrower and property, and the sample dataset `data/sample_mortgages.csv` contains fake-but-plausible rows used by the batch demo.
 
+### Scenario (toy mortgage shop)
+
+- Think of a small Italian retail bank that only handles vanilla mortgages.  
+- Borrowers apply with loan size, property value, monthly income/debt and a basic risk metric (`marginal_var` vs `var_limit`).  
+- The “decision” field is what the underwriting model or rule would output (`APPROVE`, `REJECT`, `REVIEW`).  
+- The audit log stores whether the loan respected the credit policy (LTV, DSR, VaR, positivity) and whether the incoming feature vector looks like a distribution shift.  
+- Privacy measures add noise to the numeric amounts before logging, so the ledger contains tamper-evident summaries rather than raw salaries or property prices.
+
 ### Policy Profiles
 
 Constraints are organized as profiles. The default `financial_basic` bundle mirrors the logic in `policies/financial_basic.json`. You can either select another registered profile via `Config(policy_profile="...")` or point `Config.policy_config_path` to a JSON file using the same schema:
@@ -88,6 +96,13 @@ Supported constraint `type` values include:
 - `lte_field`: left field must be less-or-equal than another field (with optional `other_default`);
 - `positive`: every field listed must be strictly positive;
 - `value_max`: single field must stay under a constant `max`.
+- `value_min`: single field must stay above a constant `min`.
+
+Bundled profiles:
+- `financial_basic` — friendly underwriting limits (LTV≤80%, DSR≤35%, VaR ≤ limit, positive amounts).
+- `financial_strict` — harsher LTV/DSR limits, VaR cushion (0.9) and minimum borrower income (≥2.5k/month). See `policies/financial_strict.json`.
+
+You can override everything by pointing `policy_config_path` (CLI: `--policy-config`) to your own JSON layout.
 
 ## Library Usage
 
@@ -135,7 +150,7 @@ print("\nSystematic tests:")
 print(orch.run_system_tests())
 ```
 
-Alternatively, you can use the minimal CLI:
+Alternatively, you can use the minimal CLI (global options `--policy-profile` or `--policy-config` apply to every command):
 
 ```bash
 # Run deterministic test suite
@@ -147,11 +162,11 @@ python3 -m interface.cli --verify
 # Print a portfolio snapshot (counts, decisions, privacy status)
 python3 -m interface.cli --summary
 
-# Run the demonstration sequence
-python3 -m interface.cli --demo
+# Run the demonstration sequence (use --policy-profile to switch bundles)
+python3 -m interface.cli --demo --policy-profile financial_strict
 
 # Replay the batch mortgage dataset (writes into the Merkle log)
-python3 -m interface.cli --demo-batch --data-path data/sample_mortgages.csv
+python3 -m interface.cli --demo-batch --data-path data/sample_mortgages.csv --policy-profile financial_strict
 ```
 
 ## Key Properties

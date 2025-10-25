@@ -71,6 +71,12 @@ def _constraint_fn_from_spec(spec: Dict[str, Any]) -> Callable[[Dict[str, Any]],
         def check_fn(ctx: Dict[str, Any]) -> bool:
             return float(ctx.get(field, 0.0)) <= limit
         return check_fn
+    if ctype == "value_min":
+        field = spec["field"]
+        limit = float(spec["min"])
+        def check_fn(ctx: Dict[str, Any]) -> bool:
+            return float(ctx.get(field, 0.0)) >= limit
+        return check_fn
     raise ValueError(f"Unsupported constraint type: {ctype}")
 
 def load_constraints_from_json(path: str) -> ConstraintChecker:
@@ -123,6 +129,54 @@ DEFAULT_FINANCIAL_CONSTRAINTS: List[Dict[str, Any]] = [
 def setup_financial_constraints() -> ConstraintChecker:
     return build_constraints_from_specs(DEFAULT_FINANCIAL_CONSTRAINTS)
 
+STRICT_FINANCIAL_CONSTRAINTS: List[Dict[str, Any]] = [
+    {
+        "id": "ltv_limit_strict",
+        "type": "ratio_max",
+        "numerator": "loan_amount",
+        "denominator": "property_value",
+        "max": 0.7,
+        "severity": "critical",
+        "description": "Strict LTV: <= 70%"
+    },
+    {
+        "id": "dsr_limit_strict",
+        "type": "ratio_max",
+        "numerator": "monthly_debt",
+        "denominator": "monthly_income",
+        "max": 0.3,
+        "severity": "critical",
+        "description": "Strict DSR: <= 30%"
+    },
+    {
+        "id": "var_limit_strict",
+        "type": "lte_field",
+        "field": "marginal_var",
+        "other_field": "var_limit",
+        "other_default": 0.9,
+        "severity": "critical",
+        "description": "Strict VaR limit"
+    },
+    {
+        "id": "min_income",
+        "type": "value_min",
+        "field": "monthly_income",
+        "min": 2500,
+        "severity": "high",
+        "description": "Borrower must earn >= 2.5k per month"
+    },
+    {
+        "id": "positive_amounts",
+        "type": "positive",
+        "fields": ["loan_amount","property_value","monthly_income"],
+        "severity": "critical",
+        "description": "All amounts must be positive"
+    }
+]
+
+def setup_financial_strict_constraints() -> ConstraintChecker:
+    return build_constraints_from_specs(STRICT_FINANCIAL_CONSTRAINTS)
+
 POLICY_REGISTRY: Dict[str, Callable[[], ConstraintChecker]] = {}
 
 def register_policy_profile(name: str, builder: Callable[[], ConstraintChecker]):
@@ -134,3 +188,4 @@ def get_policy_profile(name: str) -> ConstraintChecker:
     return POLICY_REGISTRY[name]()
 
 register_policy_profile("financial_basic", setup_financial_constraints)
+register_policy_profile("financial_strict", setup_financial_strict_constraints)
