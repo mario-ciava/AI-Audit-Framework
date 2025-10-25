@@ -1,16 +1,23 @@
 import csv
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 from core.config import Config
 from core.orchestrator import AuditOrchestrator
 
-def main():
+def main(policy_profile: str = "financial_basic", policy_config_path: Optional[str] = None):
     print("="*70)
     print("AI AUDIT FRAMEWORK - TOY MORTGAGE EDITION")
     print("="*70)
 
-    config = Config(max_epsilon=20.0, drift_threshold=2.5, drift_window_size=50, schema_version="1.0.0")
+    config = Config(
+        max_epsilon=20.0,
+        drift_threshold=2.5,
+        drift_window_size=50,
+        schema_version="1.0.0",
+        policy_profile=policy_profile,
+        policy_config_path=policy_config_path
+    )
     orchestrator = AuditOrchestrator(config)
 
     print("\n[1] CLEAN RETAIL MORTGAGE REQUEST")
@@ -116,7 +123,13 @@ def main():
     print("Note: HMAC provides integrity/authenticity but NOT non-repudiation")
     print("="*70)
 
-def run_batch_from_csv(data_path: str = "data/sample_mortgages.csv", *, silent: bool = False) -> Dict[str, int]:
+def run_batch_from_csv(
+    data_path: str = "data/sample_mortgages.csv",
+    *,
+    silent: bool = False,
+    policy_profile: str = "financial_basic",
+    policy_config_path: Optional[str] = None
+) -> Dict[str, int]:
     """
     Replay a batch of toy mortgage decisions sourced from CSV.
     The file ships with fake-but-plausible numeric ranges.
@@ -127,7 +140,14 @@ def run_batch_from_csv(data_path: str = "data/sample_mortgages.csv", *, silent: 
             print(f"Dataset '{data_path}' not found.")
         return {"processed": 0, "violations": 0}
 
-    config = Config(max_epsilon=20.0, drift_threshold=2.5, drift_window_size=50, schema_version="1.0.0")
+    config = Config(
+        max_epsilon=20.0,
+        drift_threshold=2.5,
+        drift_window_size=50,
+        schema_version="1.0.0",
+        policy_profile=policy_profile,
+        policy_config_path=policy_config_path
+    )
     orchestrator = AuditOrchestrator(config)
     processed = 0
     violations = 0
