@@ -66,6 +66,8 @@ You’ll see a complete report including:
 
 By default the framework persists the Merkle chain and HMAC key under `audit_state/`, so repeated CLI runs can verify the exact same log. Remove that directory (or point `Config.chain_path` / `Config.key_path` elsewhere) to reset the history.
 
+The example scenario is a **toy retail mortgage underwriting flow**. Inputs (`loan_amount`, `property_value`, `monthly_income`, etc.) refer to the borrower and property, and the sample dataset `data/sample_mortgages.csv` contains fake-but-plausible rows used by the batch demo.
+
 ### Policy Profiles
 
 Constraints are organized as profiles. The default `financial_basic` bundle mirrors the logic in `policies/financial_basic.json`. You can either select another registered profile via `Config(policy_profile="...")` or point `Config.policy_config_path` to a JSON file using the same schema:
@@ -144,6 +146,9 @@ python3 -m interface.cli --verify
 
 # Run the demonstration sequence
 python3 -m interface.cli --demo
+
+# Replay the batch mortgage dataset (writes into the Merkle log)
+python3 -m interface.cli --demo-batch --data-path data/sample_mortgages.csv
 ```
 
 ## Key Properties
