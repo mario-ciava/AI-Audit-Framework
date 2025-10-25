@@ -111,3 +111,32 @@ class AuditOrchestrator:
         if self.config.policy_config_path:
             return load_constraints_from_json(self.config.policy_config_path)
         return get_policy_profile(self.config.policy_profile)
+
+    def get_portfolio_summary(self) -> Dict[str, Any]:
+        totals = {
+            "audits": 0,
+            "with_violations": 0,
+            "with_anomaly": 0
+        }
+        decisions = defaultdict(int)
+
+        for node in self.chain.chain:
+            data = node.data
+            if data.get("type") == "genesis":
+                continue
+            totals["audits"] += 1
+            if data.get("violations", 0):
+                totals["with_violations"] += 1
+            if data.get("anomaly"):
+                totals["with_anomaly"] += 1
+            decision_label = data.get("decision", {}).get("decision", "UNKNOWN")
+            decisions[decision_label] += 1
+
+        return {
+            "audits": totals["audits"],
+            "with_violations": totals["with_violations"],
+            "with_anomaly": totals["with_anomaly"],
+            "decisions_by_outcome": dict(decisions),
+            "privacy_budget": self.privacy.get_privacy_report(),
+            "chain_length": len(self.chain.chain)
+        }
