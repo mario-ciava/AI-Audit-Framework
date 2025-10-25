@@ -144,6 +144,9 @@ python3 -m interface.cli --tests
 # Verify Merkle chain integrity
 python3 -m interface.cli --verify
 
+# Print a portfolio snapshot (counts, decisions, privacy status)
+python3 -m interface.cli --summary
+
 # Run the demonstration sequence
 python3 -m interface.cli --demo
 
