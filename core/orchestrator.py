@@ -36,12 +36,18 @@ class AuditOrchestrator:
             if drift_result.get("drift"):
                 self.anomalies_count += 1
 
+        violation_ids = [v["id"] for v in violations]
+        period = context.get("period")
+
         audit_data: Dict[str, Any] = {
             "audit_id": audit_id,
             "decision": decision,
             "violations": len(violations),
+            "violation_ids": violation_ids,
             "anomaly": drift_result.get("drift", False) if drift_result else False
         }
+        if period:
+            audit_data["period"] = period
         if can_log and self.privacy.spend(eps, "audit_log"):
             audit_data["context"] = self._privatize_context(context)
 
@@ -119,24 +125,48 @@ class AuditOrchestrator:
             "with_anomaly": 0
         }
         decisions = defaultdict(int)
+        violations_by_id = defaultdict(int)
+        audits_by_period = defaultdict(int)
+        anomaly_audits = []
 
         for node in self.chain.chain:
             data = node.data
             if data.get("type") == "genesis":
                 continue
             totals["audits"] += 1
+            period = data.get("period")
+            if period:
+                audits_by_period[period] += 1
             if data.get("violations", 0):
                 totals["with_violations"] += 1
+                recorded_ids = data.get("violation_ids") or []
+                if not recorded_ids:
+                    recorded_ids = ["_unspecified"]
+                for v_id in recorded_ids:
+                    violations_by_id[v_id] += 1
             if data.get("anomaly"):
                 totals["with_anomaly"] += 1
+                anomaly_audits.append({
+                    "audit_id": data.get("audit_id"),
+                    "period": period
+                })
             decision_label = data.get("decision", {}).get("decision", "UNKNOWN")
             decisions[decision_label] += 1
+
+        violation_rate = (
+            totals["with_violations"] / totals["audits"]
+            if totals["audits"] else 0.0
+        )
 
         return {
             "audits": totals["audits"],
             "with_violations": totals["with_violations"],
+            "violation_rate": round(violation_rate, 4),
             "with_anomaly": totals["with_anomaly"],
             "decisions_by_outcome": dict(decisions),
+            "violations_by_id": dict(violations_by_id),
+            "audits_by_period": dict(audits_by_period),
+            "anomaly_audits": anomaly_audits,
             "privacy_budget": self.privacy.get_privacy_report(),
             "chain_length": len(self.chain.chain)
         }

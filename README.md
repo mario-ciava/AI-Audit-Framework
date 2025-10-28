@@ -75,6 +75,7 @@ The example scenario is a **toy retail mortgage underwriting flow**. Inputs (`lo
 - The “decision” field is what the underwriting model or rule would output (`APPROVE`, `REJECT`, `REVIEW`).  
 - The audit log stores whether the loan respected the credit policy (LTV, DSR, VaR, positivity) and whether the incoming feature vector looks like a distribution shift.  
 - Privacy measures add noise to the numeric amounts before logging, so the ledger contains tamper-evident summaries rather than raw salaries or property prices.
+- The sample dataset (`data/sample_mortgages.csv`) now marks each row with a `period`: `A` is a calm baseline, `B` is a riskier population that triggers drift warnings in the batch demo.
 
 ### Policy Profiles
 
@@ -95,7 +96,7 @@ Supported constraint `type` values include:
 - `ratio_max`: `numerator / denominator <= max` (with optional `min_denominator` safeguard);
 - `lte_field`: left field must be less-or-equal than another field (with optional `other_default`);
 - `positive`: every field listed must be strictly positive;
-- `value_max`: single field must stay under a constant `max`.
+- `value_max`: single field must stay under a constant `max`;
 - `value_min`: single field must stay above a constant `min`.
 
 Bundled profiles:
@@ -159,7 +160,7 @@ python3 -m interface.cli --tests
 # Verify Merkle chain integrity
 python3 -m interface.cli --verify
 
-# Print a portfolio snapshot (counts, decisions, privacy status)
+# Print a portfolio snapshot (counts, decisions, per-policy violations, periods, privacy status)
 python3 -m interface.cli --summary
 
 # Run the demonstration sequence (use --policy-profile to switch bundles)
@@ -168,6 +169,8 @@ python3 -m interface.cli --demo --policy-profile financial_strict
 # Replay the batch mortgage dataset (writes into the Merkle log)
 python3 -m interface.cli --demo-batch --data-path data/sample_mortgages.csv --policy-profile financial_strict
 ```
+
+`--summary` prints aggregate counts plus `violations_by_id`, `audits_by_period` and `anomaly_audits` so you can see which policies and periods fire the most (older blocks without detailed IDs appear under `_unspecified`).
 
 ## Key Properties
 
