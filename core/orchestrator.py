@@ -5,6 +5,7 @@ from .config import Config
 from .crypto import SimpleCrypto
 from .merkle import MerkleChain
 from .constraints import ConstraintChecker, get_policy_profile, load_constraints_from_json
+from .fairness import compute_group_metrics
 from .privacy import PrivacyAccountant
 from .drift import MultivariateDriftDetector
 from .testing import SystematicTester
@@ -38,6 +39,7 @@ class AuditOrchestrator:
 
         violation_ids = [v["id"] for v in violations]
         period = context.get("period")
+        segment = context.get("segment")
         model_decision = decision.get("decision", "UNKNOWN")
         model_score = decision.get("score", decision.get("confidence"))
         policy_blocked = len(violations) > 0
@@ -58,6 +60,8 @@ class AuditOrchestrator:
         }
         if period:
             audit_data["period"] = period
+        if segment:
+            audit_data["segment"] = segment
         if can_log and self.privacy.spend(eps, "audit_log"):
             audit_data["context"] = self._privatize_context(context)
 
@@ -189,6 +193,7 @@ class AuditOrchestrator:
             "violations_by_id": dict(violations_by_id),
             "audits_by_period": dict(audits_by_period),
             "anomaly_audits": anomaly_audits,
+            "fairness": compute_group_metrics(self.chain.chain, attribute="segment"),
             "privacy_budget": self.privacy.get_privacy_report(),
             "chain_length": len(self.chain.chain)
         }

@@ -1,5 +1,10 @@
 # AI Audit Framework
 
+[![Status](https://img.shields.io/badge/Status-Prototype-blue)]()
+[![Python](https://img.shields.io/badge/Python-3.10+-green)]()
+[![License](https://img.shields.io/badge/License-MIT-yellow)]()
+[![Tests](https://img.shields.io/badge/Tests-7%20Passing-success)]()
+
 > The project implements a compact, fully working core for **auditing AI or rule-based decisions** in financial workflows.  It focuses on correctness, determinism and clarity rather than feature count:
 
 - **deterministic Merkle log** with HMAC-SHA256 for integrity and authenticity;
@@ -67,7 +72,7 @@ You’ll see a complete report including:
 
 By default the framework persists the Merkle chain and HMAC key under `audit_state/`, so repeated CLI runs can verify the exact same log. Remove that directory (or point `Config.chain_path` / `Config.key_path` elsewhere) to reset the history.
 
-The example scenario is a **toy retail mortgage underwriting flow**. Inputs (`loan_amount`, `property_value`, `monthly_income`, etc.) refer to the borrower and property, and the sample dataset `data/sample_mortgages.csv` contains fake-but-plausible rows used by the batch demo.
+- The example scenario is a **toy retail mortgage underwriting flow**. Inputs (`loan_amount`, `property_value`, `monthly_income`, etc.) refer to the borrower and property and the sample dataset `data/sample_mortgages.csv` contains fake-but-plausible rows used by the batch demo.
 
 ### Scenario (toy mortgage shop)
 
@@ -77,7 +82,8 @@ The example scenario is a **toy retail mortgage underwriting flow**. Inputs (`lo
 - The audit log stores whether the loan respected the credit policy (LTV, DSR, VaR, positivity) and whether the incoming feature vector looks like a distribution shift.  
 - Privacy measures add noise to the numeric amounts before logging, so the ledger contains tamper-evident summaries rather than raw salaries or property prices.
 - The sample dataset (`data/sample_mortgages.csv`) now marks each row with a `period`: `A` is a calm baseline, `B` is a riskier population that triggers drift warnings in the batch demo.
-- A toy scoring engine (`core/model.py`) produces `decision`, `score` and short textual reasons from the raw context. The orchestrator logs this model output, runs policy checks on top, and records whether policy overrides the model (e.g., model APPROVE but credit policy violated).
+- Each row also carries a `segment` (e.g., `prime` vs `near_prime`). The orchestrator logs this attribute outside of the privatized context so that fairness metrics (approval rates, policy overrides, average scores) can be compared across segments.
+- A toy scoring engine (`core/model.py`) produces `decision`, `score` and short textual reasons from the raw context. The orchestrator logs this model output, runs policy checks on top and records whether policy overrides the model (e.g., model APPROVE but credit policy violated).
 
 ### Policy Profiles
 
@@ -165,6 +171,9 @@ python3 -m interface.cli --verify
 # Print a portfolio snapshot (counts, decisions, per-policy violations, periods, privacy status)
 python3 -m interface.cli --summary
 
+# Print only fairness metrics by segment (model vs final approval rates)
+python3 -m interface.cli --fairness
+
 # Run the demonstration sequence (use --policy-profile to switch bundles)
 python3 -m interface.cli --demo --policy-profile financial_strict
 
@@ -172,7 +181,7 @@ python3 -m interface.cli --demo --policy-profile financial_strict
 python3 -m interface.cli --demo-batch --data-path data/sample_mortgages.csv --policy-profile financial_strict
 ```
 
-`--summary` prints aggregate counts plus `violations_by_id`, `audits_by_period`, `model_decisions`, `final_outcomes`, `policy_overrides` and `anomaly_audits` so you can see how the model behaves, when policy intervenes and which periods/policies fire the most.
+`--summary` prints aggregate counts plus `violations_by_id`, `audits_by_period`, `model_decisions`, `final_outcomes`, `policy_overrides`, fairness metrics and `anomaly_audits` so you can see how the model behaves, when policy intervenes and which periods/policies fire the most.
 
 ## Key Properties
 
@@ -214,3 +223,7 @@ python3 -m interface.cli --demo-batch --data-path data/sample_mortgages.csv --po
 - [ ] NumPy-backed full-covariance drift mode  
 - [x] Pluggable constraint registry (basic JSON policy profiles)   
 - [ ] Simple HTML summary report (no web framework)
+
+## License
+
+See [LICENSE](./LICENSE).
