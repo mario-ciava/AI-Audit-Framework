@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from core.config import Config
+from core.model import mortgage_risk_model
 from core.orchestrator import AuditOrchestrator
 
 def main(policy_profile: str = "financial_basic", policy_config_path: Optional[str] = None):
@@ -22,7 +23,6 @@ def main(policy_profile: str = "financial_basic", policy_config_path: Optional[s
 
     print("\n[1] CLEAN RETAIL MORTGAGE REQUEST")
     print("-"*40)
-    decision1 = {"decision":"APPROVE","confidence":0.85}
     context1 = {
         "loan_amount":150000,
         "property_value":200000,
@@ -33,15 +33,21 @@ def main(policy_profile: str = "financial_basic", policy_config_path: Optional[s
         "features":[150000,200000,1000,6000,0.5],
         "period":"demo_clean"
     }
+    model1 = mortgage_risk_model(context1)
+    decision1 = {
+        "decision": model1.decision,
+        "score": model1.score,
+        "reasons": model1.reasons
+    }
     result1 = orchestrator.audit_decision(decision1, context1)
     print(f"✓ Loan ID: {result1['audit_id']}")
+    print(f"✓ Model decision: {model1.decision} (score {model1.score})")
     print(f"✓ Underwriting checks passed: {result1['constraints']['passed']}")
     print(f"✓ Block hash: {result1['block_hash'][:16]}...")
     print(f"✓ Privacy budget spent: {result1['privacy_budget']['spent']:.2f}")
 
     print("\n[2] STRESSED BORROWER (POLICY FAIL)")
     print("-"*40)
-    decision2 = {"decision":"APPROVE","confidence":0.90}
     context2 = {
         "loan_amount":200000,
         "property_value":210000,
@@ -52,6 +58,12 @@ def main(policy_profile: str = "financial_basic", policy_config_path: Optional[s
         "features":[200000,210000,3000,5000,1.5],
         "period":"demo_stress"
     }
+    model2 = mortgage_risk_model(context2)
+    decision2 = {
+        "decision": model2.decision,
+        "score": model2.score,
+        "reasons": model2.reasons
+    }
     result2 = orchestrator.audit_decision(decision2, context2)
     print(f"✗ Violations found: {len(result2['constraints']['violations'])} (LTV/DSR/VAR)")
     for v in result2['constraints']['violations']:
@@ -61,7 +73,6 @@ def main(policy_profile: str = "financial_basic", policy_config_path: Optional[s
     print("-"*40)
     drift_notified = False
     for i in range(25):
-        decision = {"decision":"APPROVE","confidence":0.8}
         context = {
             "loan_amount":150000+i*100,
             "property_value":200000,
@@ -72,9 +83,14 @@ def main(policy_profile: str = "financial_basic", policy_config_path: Optional[s
             "features":[150000+i*100,200000,1000,6000,0.5],
             "period":"demo_ref"
         }
+        model = mortgage_risk_model(context)
+        decision = {
+            "decision": model.decision,
+            "score": model.score,
+            "reasons": model.reasons
+        }
         orchestrator.audit_decision(decision, context)
     for i in range(25):
-        decision = {"decision":"APPROVE","confidence":0.6}
         context = {
             "loan_amount":300000+i*500,
             "property_value":350000,
@@ -84,6 +100,12 @@ def main(policy_profile: str = "financial_basic", policy_config_path: Optional[s
             "var_limit":1.0,
             "features":[300000+i*500,350000,4000,8000,0.9],
             "period":"demo_shift"
+        }
+        model = mortgage_risk_model(context)
+        decision = {
+            "decision": model.decision,
+            "score": model.score,
+            "reasons": model.reasons
         }
         result = orchestrator.audit_decision(decision, context)
         if result["drift"] and result["drift"].get("drift"):
@@ -181,7 +203,6 @@ def run_batch_from_csv(
         reader = csv.DictReader(handle)
         for row in reader:
             try:
-                decision = _row_to_decision(row)
                 context = _row_to_context(row)
             except ValueError as exc:
                 if not silent:
@@ -193,6 +214,13 @@ def run_batch_from_csv(
                 label = "reference" if last_period is None else "shift"
                 print(f"\n=== Period {period} ({label}) ===")
                 last_period = period
+            model_out = mortgage_risk_model(context)
+            decision = {
+                "decision": model_out.decision,
+                "score": model_out.score,
+                "reasons": model_out.reasons,
+                "reference_decision": row.get("decision")
+            }
             result = orchestrator.audit_decision(decision, context)
             processed += 1
             violations += len(result["constraints"]["violations"])
@@ -228,13 +256,6 @@ def run_batch_from_csv(
         "drift_alerts": drift_hits,
         "periods": sorted(periods_seen),
         "drift_details": drift_details
-    }
-
-def _row_to_decision(row: Dict[str, str]) -> Dict[str, str]:
-    confidence = float(row.get("confidence", 0.0) or 0.0)
-    return {
-        "decision": row.get("decision", "REVIEW"),
-        "confidence": max(0.0, min(confidence, 1.0))
     }
 
 def _row_to_context(row: Dict[str, str]) -> Dict[str, float]:
