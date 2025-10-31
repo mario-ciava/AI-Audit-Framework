@@ -42,6 +42,7 @@ It is a **prototype**, intentionally modest, meant for learning, validation and 
 - `crypto.py` — HMAC-SHA256 signing and hashing;
 - `merkle.py` — hash-linked, signed audit records;  
 - `constraints.py` — safe policy validation (pure functions);
+- `model.py` — tiny mortgage scoring engine (swap with any AI/model hook);
 - `privacy.py` — ε-DP budget management with Laplace noise and clipping;  
 - `drift.py` — lightweight multivariate drift detection;
 - `testing.py` — deterministic test suite;
@@ -76,6 +77,7 @@ The example scenario is a **toy retail mortgage underwriting flow**. Inputs (`lo
 - The audit log stores whether the loan respected the credit policy (LTV, DSR, VaR, positivity) and whether the incoming feature vector looks like a distribution shift.  
 - Privacy measures add noise to the numeric amounts before logging, so the ledger contains tamper-evident summaries rather than raw salaries or property prices.
 - The sample dataset (`data/sample_mortgages.csv`) now marks each row with a `period`: `A` is a calm baseline, `B` is a riskier population that triggers drift warnings in the batch demo.
+- A toy scoring engine (`core/model.py`) produces `decision`, `score` and short textual reasons from the raw context. The orchestrator logs this model output, runs policy checks on top, and records whether policy overrides the model (e.g., model APPROVE but credit policy violated).
 
 ### Policy Profiles
 
@@ -170,7 +172,7 @@ python3 -m interface.cli --demo --policy-profile financial_strict
 python3 -m interface.cli --demo-batch --data-path data/sample_mortgages.csv --policy-profile financial_strict
 ```
 
-`--summary` prints aggregate counts plus `violations_by_id`, `audits_by_period` and `anomaly_audits` so you can see which policies and periods fire the most (older blocks without detailed IDs appear under `_unspecified`).
+`--summary` prints aggregate counts plus `violations_by_id`, `audits_by_period`, `model_decisions`, `final_outcomes`, `policy_overrides` and `anomaly_audits` so you can see how the model behaves, when policy intervenes and which periods/policies fire the most.
 
 ## Key Properties
 
