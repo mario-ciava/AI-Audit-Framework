@@ -31,7 +31,8 @@ def main(policy_profile: str = "financial_basic", policy_config_path: Optional[s
         "marginal_var":0.5,
         "var_limit":1.0,
         "features":[150000,200000,1000,6000,0.5],
-        "period":"demo_clean"
+        "period":"demo_clean",
+        "segment":"prime"
     }
     model1 = mortgage_risk_model(context1)
     decision1 = {
@@ -56,7 +57,8 @@ def main(policy_profile: str = "financial_basic", policy_config_path: Optional[s
         "marginal_var":1.5,
         "var_limit":1.0,
         "features":[200000,210000,3000,5000,1.5],
-        "period":"demo_stress"
+        "period":"demo_stress",
+        "segment":"near_prime"
     }
     model2 = mortgage_risk_model(context2)
     decision2 = {
@@ -81,7 +83,8 @@ def main(policy_profile: str = "financial_basic", policy_config_path: Optional[s
             "marginal_var":0.5,
             "var_limit":1.0,
             "features":[150000+i*100,200000,1000,6000,0.5],
-            "period":"demo_ref"
+            "period":"demo_ref",
+            "segment":"prime"
         }
         model = mortgage_risk_model(context)
         decision = {
@@ -99,7 +102,8 @@ def main(policy_profile: str = "financial_basic", policy_config_path: Optional[s
             "marginal_var":0.9,
             "var_limit":1.0,
             "features":[300000+i*500,350000,4000,8000,0.9],
-            "period":"demo_shift"
+            "period":"demo_shift",
+            "segment":"near_prime"
         }
         model = mortgage_risk_model(context)
         decision = {
@@ -264,6 +268,7 @@ def _row_to_context(row: Dict[str, str]) -> Dict[str, float]:
         return float(raw) if str(raw).strip() else default
 
     period = (row.get("period") or "A").strip()
+    segment = (row.get("segment") or "unknown").strip()
     context = {
         "loan_amount": _f("loan_amount", 0.0),
         "property_value": _f("property_value", 1.0),
@@ -271,7 +276,8 @@ def _row_to_context(row: Dict[str, str]) -> Dict[str, float]:
         "monthly_income": _f("monthly_income", 1.0),
         "marginal_var": _f("marginal_var", 0.0),
         "var_limit": _f("var_limit", 1.0),
-        "period": period or "A"
+        "period": period or "A",
+        "segment": segment or "unknown"
     }
     context["features"] = [
         context["loan_amount"],

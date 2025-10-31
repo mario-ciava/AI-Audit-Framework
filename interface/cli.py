@@ -8,6 +8,7 @@ def main():
     p = argparse.ArgumentParser(description="AI Audit Framework CLI (minimal)")
     p.add_argument("--verify", action="store_true", help="Verify Merkle chain integrity")
     p.add_argument("--summary", action="store_true", help="Print a portfolio snapshot from the Merkle log")
+    p.add_argument("--fairness", action="store_true", help="Print fairness metrics grouped by segment")
     p.add_argument("--tests", action="store_true", help="Run deterministic test suite")
     p.add_argument("--demo", action="store_true", help="Run the demo sequence")
     p.add_argument("--demo-batch", action="store_true", help="Replay the mortgage CSV demo")
@@ -35,6 +36,11 @@ def main():
     if args.summary:
         orch = AuditOrchestrator(config)
         print(json.dumps(orch.get_portfolio_summary(), indent=2))
+        return
+    if args.fairness:
+        orch = AuditOrchestrator(config)
+        fairness = orch.get_portfolio_summary().get("fairness", {})
+        print(json.dumps(fairness, indent=2))
         return
     if args.demo_batch:
         run_batch_from_csv(
